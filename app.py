@@ -61,4 +61,4 @@ with aba_revisao:
         action_history = st.text_area(
             "Descrição da ação",
             placeholder=(
-                "Ex.: Abri 2,5 B
+                "Ex.: Abri 2.5 B
