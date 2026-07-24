@@ -2,16 +2,23 @@ import streamlit as st
 from supabase import create_client, Client
 from openai import OpenAI
 
-st.set_page_config(page_title="Poker Study Buddy", layout="wide")
+st.set_page_config(
+    page_title="Poker Study Buddy",
+    layout="wide"
+)
 
+# Connections
 url: str = st.secrets["SUPABASE_URL"]
 key: str = st.secrets["SUPABASE_KEY"]
 
 supabase: Client = create_client(url, key)
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
+if "analise_ia" not in st.session_state:
+    st.session_state.analise_ia = ""
+
 st.title("Poker Study Buddy")
-st.caption("Revisao com IA e biblioteca pessoal de estudo")
+st.caption("Revisao de Sit & Go com IA e biblioteca de maos")
 
 aba_revisao, aba_biblioteca = st.tabs(
     ["Nova Revisao", "Biblioteca de Maos"]
@@ -21,51 +28,78 @@ with aba_revisao:
     st.subheader("Registrar uma mao para estudo")
 
     with st.sidebar:
-        st.header("Configuracoes da mao")
+        st.header("Dados do torneio")
 
         modalidade = st.selectbox(
             "Modalidade",
-            ["Cash Game", "MTT", "Spin & Go"]
+            ["Sit & Go", "Spin & Go", "MTT", "Cash Game"]
         )
+
+        blinds = st.text_input(
+            "Blinds atuais",
+            placeholder="Ex.: 100 / 200"
+        )
+
+        ante = st.number_input(
+            "Ante",
+            min_value=0,
+            value=0
+        )
+
+        total_jogadores = st.number_input(
+            "Total de jogadores",
+            min_value=2,
+            value=9
+        )
+
+        jogadores_restantes = st.number_input(
+            "Jogadores restantes",
+            min_value=2,
+            value=9
+        )
+
+        fase_torneio = st.selectbox(
+            "Fase do torneio",
+            [
+                "Inicio",
+                "Meio do torneio",
+                "Bolha",
+                "ITM / Premiado",
+                "Heads-up",
+                "Final"
+            ]
+        )
+
+        estrutura_premiacao = st.text_input(
+            "Estrutura de premiacao",
+            placeholder="Ex.: 50% / 30% / 20%"
+        )
+
+    st.subheader("Hero e oponente")
+
+    hero_col, vilao_col = st.columns(2)
+
+    with hero_col:
+        st.markdown("#### Hero")
 
         hero_pos = st.selectbox(
             "Posicao do Hero",
             ["SB", "BB", "UTG", "MP", "CO", "BTN"]
         )
 
-        effective_stack = st.number_input(
-            "Stack efetivo (BBs)",
+        hero_stack = st.number_input(
+            "Stack do Hero (BBs)",
             min_value=1,
-            value=100
+            value=20
         )
 
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.header("Hero e board")
-
         hand_cards = st.text_input(
-            "Suas cartas",
+            "Cartas do Hero",
             placeholder="Ex.: Ad Ks"
         )
 
-        flop = st.text_input(
-            "Flop",
-            placeholder="Ex.: 2h 7s 9c"
-        )
-
-        turn = st.text_input(
-            "Turn",
-            placeholder="Ex.: Jh"
-        )
-
-        river = st.text_input(
-            "River",
-            placeholder="Ex.: As"
-        )
-
-    with col2:
-        st.header("Oponente")
+    with vilao_col:
+        st.markdown("#### Oponente principal")
 
         opponent_position = st.selectbox(
             "Posicao do oponente",
@@ -75,22 +109,48 @@ with aba_revisao:
         opponent_stack = st.number_input(
             "Stack do oponente (BBs)",
             min_value=0,
-            value=100
+            value=20
         )
 
         opponent_cards = st.text_input(
             "Cartas do oponente",
-            placeholder="Ex.: Qh Jd (deixe vazio se nao houve showdown)"
+            placeholder="Ex.: Qh Jd - deixe vazio se nao houve showdown"
+        )
+
+    effective_stack = min(hero_stack, opponent_stack) if opponent_stack > 0 else hero_stack
+
+    st.info(f"Stack efetivo para a mao: {effective_stack} BBs")
+
+    st.subheader("Board")
+
+    board_col1, board_col2, board_col3 = st.columns(3)
+
+    with board_col1:
+        flop = st.text_input(
+            "Flop",
+            placeholder="Ex.: 2h 7s 9c"
+        )
+
+    with board_col2:
+        turn = st.text_input(
+            "Turn",
+            placeholder="Ex.: Jh"
+        )
+
+    with board_col3:
+        river = st.text_input(
+            "River",
+            placeholder="Ex.: As"
         )
 
     st.subheader("Acao e duvida")
 
     action_history = st.text_area(
-        "Sua acao / linha completa da mao",
+        "Linha completa da mao",
         placeholder=(
             "Ex.: Hero abre 2.5 BB no BTN. BB paga. "
             "Flop: BB check, Hero aposta 33% do pote, BB paga. "
-            "Turn: BB check..."
+            "Turn: BB check, Hero aposta 60%..."
         ),
         height=150
     )
@@ -98,28 +158,28 @@ with aba_revisao:
     opponent_action = st.text_area(
         "Acao do oponente",
         placeholder=(
-            "Ex.: BB pagou pre-flop, deu check no flop, "
-            "pagou a c-bet e deu check no turn."
+            "Ex.: BB paga pre-flop, da check no flop, "
+            "paga a c-bet e da check no turn."
         ),
-        height=120
+        height=110
     )
 
     user_question = st.text_area(
         "Sua duvida principal",
-        placeholder="Ex.: Devo apostar no turn ou dar check-back?"
+        placeholder=(
+            "Ex.: Na bolha, com 14 BBs, este spot e shove, "
+            "min-raise ou fold?"
+        )
     )
 
     st.divider()
-
-    if "analise_ia" not in st.session_state:
-        st.session_state.analise_ia = ""
 
     botao_analise, botao_salvar = st.columns(2)
 
     with botao_analise:
         if st.button("Analisar com IA", type="secondary"):
             if hand_cards.strip() and action_history.strip():
-                with st.spinner("O treinador esta pensando..."):
+                with st.spinner("O treinador esta analisando a mao..."):
                     try:
                         cartas_vilao = (
                             opponent_cards.strip()
@@ -128,41 +188,56 @@ with aba_revisao:
                         )
 
                         prompt = f"""
-Voce e um treinador profissional de poker. Analise esta mao para estudo.
+Voce e um treinador profissional de poker especializado em Sit & Go,
+ICM, push-fold e estrategia de torneios.
 
+Analise a mao abaixo em portugues, com foco em estudo pratico.
+
+DADOS DO TORNEIO
 Modalidade: {modalidade}
-Posicao do Hero: {hero_pos}
-Stack efetivo: {effective_stack} BBs
-Cartas do Hero: {hand_cards.strip()}
+Blinds: {blinds or "Nao informados"}
+Ante: {ante}
+Jogadores restantes: {jogadores_restantes} de {total_jogadores}
+Fase do torneio: {fase_torneio}
+Estrutura de premiacao: {estrutura_premiacao or "Nao informada"}
 
-Posicao do oponente: {opponent_position}
-Stack do oponente: {opponent_stack} BBs
-Cartas do oponente: {cartas_vilao}
+HERO
+Posicao: {hero_pos}
+Stack: {hero_stack} BBs
+Cartas: {hand_cards.strip()}
 
-Board:
+OPONENTE PRINCIPAL
+Posicao: {opponent_position}
+Stack: {opponent_stack} BBs
+Cartas: {cartas_vilao}
+
+STACK EFETIVO
+{effective_stack} BBs
+
+BOARD
 Flop: {flop.strip() or "Nao informado"}
 Turn: {turn.strip() or "Nao informado"}
 River: {river.strip() or "Nao informado"}
 
-Linha completa / acao do Hero:
+LINHA COMPLETA DA MAO
 {action_history.strip()}
 
-Acao do oponente:
+ACAO DO OPONENTE
 {opponent_action.strip() or "Nao informada"}
 
-Duvida principal:
+DUVIDA PRINCIPAL
 {user_question.strip() or "Nao informada"}
 
-Faca uma analise tecnica e didatica em portugues.
-Explique:
-1. Ranges provaveis do Hero e do oponente.
-2. Pontos importantes de pre-flop, flop, turn e river disponiveis.
-3. Acoes alternativas e tamanhos de aposta possiveis.
-4. Se a linha escolhida parece boa, discutivel ou um erro.
-5. Uma conclusao pratica e curta para estudo.
+Estruture a resposta desta forma:
+1. Resumo do spot.
+2. Consideracoes de ICM e pressao de bolha, quando aplicavel.
+3. Range provavel do Hero e do oponente.
+4. Analise da melhor linha por rua: pre-flop, flop, turn e river.
+5. Avaliacao dos tamanhos de aposta e alternativas.
+6. Conclusao objetiva: melhor decisao pratica e principal aprendizado.
 
-Nao invente informacoes ausentes. Se algo importante estiver faltando,
-diga exatamente o que precisaria saber para avaliar melhor.
+Nao invente informacoes que nao foram fornecidas.
+Se faltarem dados importantes, diga quais dados fariam diferenca.
 """
 
                         response = client.chat.completions.create(
@@ -171,8 +246,10 @@ diga exatamente o que precisaria saber para avaliar melhor.
                                 {
                                     "role": "system",
                                     "content": (
-                                        "Voce e um expert em poker, com abordagem "
-                                        "tecnica, equilibrada e focada em estudo."
+                                        "Voce e um coach de poker tecnico, didatico "
+                                        "e honesto. Priorize ICM em Sit & Go, mas "
+                                        "nao trate recomendacoes como certeza quando "
+                                        "faltarem dados."
                                     )
                                 },
                                 {
@@ -190,7 +267,7 @@ diga exatamente o que precisaria saber para avaliar melhor.
                         st.error(f"Erro na analise: {error}")
             else:
                 st.warning(
-                    "Preencha pelo menos as suas cartas e a linha da mao para analisar."
+                    "Preencha as cartas do Hero e a linha completa da mao antes de analisar."
                 )
 
     if st.session_state.analise_ia:
@@ -215,12 +292,18 @@ diga exatamente o que precisaria saber para avaliar melhor.
                         "cartas_oponente": opponent_cards.strip(),
                         "posicao_oponente": opponent_position,
                         "stack_oponente": opponent_stack,
-                        "acao_oponente": opponent_action.strip()
+                        "acao_oponente": opponent_action.strip(),
+                        "blinds": blinds.strip(),
+                        "ante": ante,
+                        "jogadores_restantes": jogadores_restantes,
+                        "total_jogadores": total_jogadores,
+                        "estrutura_premiacao": estrutura_premiacao.strip(),
+                        "fase_torneio": fase_torneio
                     }
 
                     supabase.table("maos").insert(data).execute()
 
-                    st.success("Mao salva com sucesso!")
+                    st.success("Mao salva na biblioteca com sucesso!")
                     st.session_state.analise_ia = ""
                     st.balloons()
 
@@ -228,7 +311,7 @@ diga exatamente o que precisaria saber para avaliar melhor.
                     st.error(f"Erro ao salvar: {error}")
             else:
                 st.warning(
-                    "Preencha pelo menos as suas cartas e a linha da mao antes de salvar."
+                    "Preencha as cartas do Hero e a linha completa da mao antes de salvar."
                 )
 
 with aba_biblioteca:
@@ -256,48 +339,67 @@ with aba_biblioteca:
                 titulo = (
                     f"{data_salva} | Hero: {mao.get('cartas', '-')} "
                     f"| {mao.get('posicao', '-')} "
-                    f"| Vilao: {mao.get('posicao_oponente', '-')}"
+                    f"| {mao.get('fase_torneio', '-')}"
                 )
 
                 with st.expander(titulo):
-                    hero_col, vilao_col = st.columns(2)
+                    torneio_col, hero_col, vilao_col = st.columns(3)
+
+                    with torneio_col:
+                        st.markdown("**Torneio**")
+                        st.write(f"Modalidade: {mao.get('modalidade') or '-'}")
+                        st.write(f"Blinds: {mao.get('blinds') or '-'}")
+                        st.write(f"Ante: {mao.get('ante') or 0}")
+                        st.write(
+                            f"Jogadores: "
+                            f"{mao.get('jogadores_restantes') or '-'} de "
+                            f"{mao.get('total_jogadores') or '-'}"
+                        )
+                        st.write(f"Fase: {mao.get('fase_torneio') or '-'}")
+                        st.write(
+                            f"Premiacao: {mao.get('estrutura_premiacao') or '-'}"
+                        )
 
                     with hero_col:
-                        st.write("**Hero**")
+                        st.markdown("**Hero**")
                         st.write(f"Cartas: {mao.get('cartas') or '-'}")
                         st.write(f"Posicao: {mao.get('posicao') or '-'}")
-                        st.write(f"Stack efetivo: {mao.get('stack') or '-'} BB")
+                        st.write(
+                            f"Stack efetivo: {mao.get('stack') or '-'} BBs"
+                        )
 
                     with vilao_col:
-                        st.write("**Oponente**")
+                        st.markdown("**Oponente**")
                         st.write(
-                            f"Cartas: {mao.get('cartas_oponente') or 'Desconhecidas'}"
+                            f"Cartas: "
+                            f"{mao.get('cartas_oponente') or 'Desconhecidas'}"
                         )
                         st.write(
-                            f"Posicao: {mao.get('posicao_oponente') or 'Desconhecida'}"
+                            f"Posicao: "
+                            f"{mao.get('posicao_oponente') or 'Desconhecida'}"
                         )
                         st.write(
-                            f"Stack: {mao.get('stack_oponente') or '-'} BB"
+                            f"Stack: {mao.get('stack_oponente') or '-'} BBs"
                         )
 
-                    st.write("**Board**")
+                    st.markdown("**Board**")
                     st.write(
                         f"Flop: {mao.get('flop') or '-'} | "
                         f"Turn: {mao.get('turn') or '-'} | "
                         f"River: {mao.get('river') or '-'}"
                     )
 
-                    st.write("**Linha da mao / acao do Hero**")
+                    st.markdown("**Linha completa da mao**")
                     st.write(mao.get("acao") or "-")
 
-                    st.write("**Acao do oponente**")
+                    st.markdown("**Acao do oponente**")
                     st.write(mao.get("acao_oponente") or "-")
 
-                    st.write("**Duvida**")
+                    st.markdown("**Duvida**")
                     st.write(mao.get("duvida") or "-")
 
-                    st.write("**Analise da IA / aprendizado**")
+                    st.markdown("**Analise da IA / aprendizado**")
                     st.write(mao.get("aprendizado") or "-")
 
     except Exception as error:
-        st.error(f"Erro ao carregar biblioteca: {error}")
+        st.error(f"Erro ao carregar a biblioteca: {error}")
