@@ -1,61 +1,64 @@
 import streamlit as st
 from supabase import create_client, Client
 
-# Configuração das credenciais (puxando dos Secrets)
+st.set_page_config(page_title="Poker Study Buddy", layout="wide")
+
+# Credenciais guardadas nos Secrets do Streamlit Cloud
 url: str = st.secrets["SUPABASE_URL"]
 key: str = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(url, key)
 
-st.set_page_config(page_title="Poker Study Buddy", layout="wide")
-
 st.title("♠️ Poker Study Buddy")
-st.subheader("Ferramenta de Revisão de Mãos")
+st.caption("Revisão pós-jogo e biblioteca pessoal de estudo")
 
-with st.sidebar:
-    st.header("Configurações")
-    modalidade = st.selectbox("Modalidade", ["Cash Game", "MTT", "Spin & Go"])
-    hero_pos = st.selectbox("Posição", ["SB", "BB", "UTG", "MP", "CO", "BTN"])
-    effective_stack = st.number_input("Stack (BBs)", value=100)
+aba_revisao, aba_biblioteca = st.tabs(
+    ["📝 Nova Revisão", "📚 Biblioteca de Mãos"]
+)
 
-col1, col2 = st.columns(2)
+with aba_revisao:
+    st.subheader("Registrar uma mão para estudo")
 
-with col1:
-    st.header("🃏 A Mão")
-    hand_cards = st.text_input("Suas Cartas", placeholder="Ad Ks")
-    flop = st.text_input("Flop", placeholder="2h 7s 9c")
-    turn = st.text_input("Turn")
-    river = st.text_input("River")
+    with st.sidebar:
+        st.header("Configurações da mão")
+        modalidade = st.selectbox(
+            "Modalidade",
+            ["Cash Game", "MTT", "Spin & Go"]
+        )
+        hero_pos = st.selectbox(
+            "Posição do Hero",
+            ["SB", "BB", "UTG", "MP", "CO", "BTN"]
+        )
+        effective_stack = st.number_input(
+            "Stack efetivo (BBs)",
+            min_value=1,
+            value=100
+        )
 
-with col2:
-    st.header("📑 Ação e Dúvida")
-    action_history = st.text_area("Descrição da ação")
-    user_question = st.text_area("O que te deixou em dúvida?")
+    col1, col2 = st.columns(2)
 
-st.divider()
+    with col1:
+        st.header("🃏 Cartas e board")
+        hand_cards = st.text_input(
+            "Suas cartas",
+            placeholder="Ex.: Ad Ks",
+            help="Use: s = espadas, h = copas, d = ouros, c = paus."
+        )
+        flop = st.text_input(
+            "Flop",
+            placeholder="Ex.: 2h 7s 9c"
+        )
+        turn = st.text_input(
+            "Turn",
+            placeholder="Ex.: Jh"
+        )
+        river = st.text_input(
+            "River",
+            placeholder="Ex.: As"
+        )
 
-if st.button("🚀 Salvar Revisão"):
-    if hand_cards and action_history:
-        try:
-            # Prepara os dados para o Supabase
-            data = {
-                "modalidade": modalidade,
-                "posicao": hero_pos,
-                "stack": effective_stack,
-                "cartas": hand_cards,
-                "flop": flop,
-                "turn": turn,
-                "river": river,
-                "acao": action_history,
-                "duvida": user_question
-            }
-            
-            # Tenta inserir na tabela 'maos'
-            response = supabase.table("maos").insert(data).execute()
-            
-            st.success("✅ Mão salva com sucesso no banco de dados!")
-            st.balloons()
-            
-        except Exception as e:
-            st.error(f"Erro ao salvar: {e}")
-    else:
-        st.warning("Preencha as cartas e a ação antes de salvar.")
+    with col2:
+        st.header("📑 Ação e reflexão")
+        action_history = st.text_area(
+            "Descrição da ação",
+            placeholder=(
+                "Ex.: Abri 2,5 B
