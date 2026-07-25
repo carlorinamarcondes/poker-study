@@ -1229,9 +1229,19 @@ with aba_biblioteca:
         if not maos:
             st.info("Nenhuma mao salva ainda. Registre sua primeira mao na aba Nova Revisao!")
         else:
-            for mao in maos:
+            for idx, mao in enumerate(maos, start=1):
                 nota_label = mao.get("nota","?")
+                # Formata data do created_at (ex: "2026-07-25T14:32:00" -> "25/07/2026 14:32")
+                created_raw = mao.get("created_at", "")
+                try:
+                    from datetime import datetime
+                    dt = datetime.fromisoformat(created_raw.replace("Z", "+00:00"))
+                    data_fmt = dt.strftime("%d/%m/%Y %H:%M")
+                except Exception:
+                    data_fmt = created_raw[:10] if created_raw else "?"
+                mao_id = mao.get("id", idx)
                 titulo = (
+                    f"#{mao_id}  |  {data_fmt}  |  "
                     f"{mao.get('cartas_master','?')}  |  "
                     f"{mao.get('posicao_master','?')}  |  "
                     f"Nota: {nota_label}/10"
