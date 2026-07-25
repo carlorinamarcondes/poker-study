@@ -1,169 +1,636 @@
---- a//home/ubuntu/app.py
-+++ b//home/ubuntu/app.py
-@@ -536,63 +536,103 @@
--   535	
--   536	            if acertou:
--   537	                st.success(
--   538	                    f"Decisao correta! A jogada ideal era **{decisao_correta}**."
--   539	                )
--   540	            else:
--   541	                st.error(
--   542	                    f"Nao foi a melhor opcao. A jogada ideal era **{decisao_correta}**."
--   543	                )
--   544	
--   545	            raciocinio = result.get("raciocinio_ideal", "")
--   546	            if raciocinio:
--   547	                st.markdown("**Raciocinio ideal:**")
--   548	                st.info(raciocinio)
--   549	
--   550	            show_result(result, key_suffix="simulador")
--   551	
--   552	# =========== ABA BIBLIOTECA ===========
--   553	with aba_biblioteca:
--   554	    st.subheader("Suas maos salvas")
--   555	
--   556	    try:
--   557	        resp = (
--   558	            supabase.table("maos")
--   559	            .select("*")
--   560	            .order("created_at", desc=True)
--   561	            .limit(30)
--   562	            .execute()
--   563	        )
--   564	        maos = resp.data
--   565	
--   566	        if not maos:
--   567	            st.info(
--   568	                "Nenhuma mao salva ainda. "
--   569	                "Registre sua primeira mao na aba Nova Revisao!"
--   570	            )
--   571	        else:
--   572	            for mao in maos:
--   573	                nota_label = mao.get("nota", "?")
--   574	                titulo = (
--   575	                    f"{mao.get('cartas_master', '?')}  |  "
--   576	                    f"{mao.get('posicao_master', '?')}  |  "
--   577	                    f"Nota: {nota_label}/10"
--   578	                )
--   579	                with st.expander(titulo):
--   580	                    col_a, col_b = st.columns(2)
--   581	                    with col_a:
--   582	                        st.markdown(
--   583	                            f"**Stack:** {mao.get('stack_master', '?')} BBs"
--   584	                        )
--   585	                        st.markdown(f"**Flop:** {mao.get('flop', '-')}")
--   586	                        st.markdown(f"**Turn:** {mao.get('turn', '-')}")
--   587	                        st.markdown(f"**River:** {mao.get('river', '-')}")
--   588	                    with col_b:
--   589	                        if mao.get("cartas_oponente"):
--   590	                            st.markdown(
--   591	                                f"**Oponente:** {mao['cartas_oponente']}"
--   592	                            )
--   593	                        st.markdown("**Analise da IA:**")
--   594	                        st.info(mao.get("analise_ia", ""))
--   595	    except Exception as e:
--   596	        st.error(f"Erro ao carregar biblioteca: {e}")
--   597	
-+   535	            nota = result.get("nota", "?")
-+   536	
-+   537	            # Garantia de pontuacao coerente com o acerto
-+   538	            try:
-+   539	                nota_num = int(nota)
-+   540	                if acertou and nota_num < 6:
-+   541	                    nota_num = 6
-+   542	                if not acertou and nota_num > 5:
-+   543	                    nota_num = 5
-+   544	                nota = nota_num
-+   545	            except (ValueError, TypeError):
-+   546	                pass
-+   547	
-+   548	            if acertou:
-+   549	                st.success(
-+   550	                    f"Decisao correta! A jogada ideal era **{decisao_correta}**."
-+   551	                )
-+   552	            else:
-+   553	                st.error(
-+   554	                    f"Nao foi a melhor opcao. A jogada ideal era **{decisao_correta}**."
-+   555	                )
-+   556	
-+   557	            # Painel de estatisticas
-+   558	            equity = result.get("equity_estimada", "?")
-+   559	            equity_min = result.get("equity_minima_para_call", "?")
-+   560	            ev_master = result.get("ev_decisao_master", "?")
-+   561	            ev_correto = result.get("ev_decisao_correta", "?")
-+   562	
-+   563	            st.markdown("#### Estatisticas da decisao")
-+   564	            s1, s2, s3, s4, s5 = st.columns(5)
-+   565	            s1.metric("Nota", f"{nota}/10")
-+   566	            s2.metric("Equity estimada", f"{equity}%")
-+   567	            s3.metric("Equity minima p/ call", f"{equity_min}%")
-+   568	
-+   569	            try:
-+   570	                ev_m = float(ev_master)
-+   571	                ev_c = float(ev_correto)
-+   572	                s4.metric(
-+   573	                    "EV da sua decisao",
-+   574	                    f"{ev_m:+.0f}",
-+   575	                    delta=f"{ev_m - ev_c:+.0f} vs ideal",
-+   576	                    delta_color="normal"
-+   577	                )
-+   578	                s5.metric("EV da decisao ideal", f"{ev_c:+.0f}")
-+   579	            except (TypeError, ValueError):
-+   580	                s4.metric("EV da sua decisao", str(ev_master))
-+   581	                s5.metric("EV da decisao ideal", str(ev_correto))
-+   582	
-+   583	            raciocinio = result.get("raciocinio_ideal", "")
-+   584	            if raciocinio:
-+   585	                st.markdown("**Raciocinio passo a passo:**")
-+   586	                st.info(raciocinio)
-+   587	
-+   588	            # Sobrescreve a nota no resultado para show_result usar a corrigida
-+   589	            result["nota"] = nota
-+   590	            show_result(result, key_suffix="simulador")
-+   591	
-+   592	# =========== ABA BIBLIOTECA ===========
-+   593	with aba_biblioteca:
-+   594	    st.subheader("Suas maos salvas")
-+   595	
-+   596	    try:
-+   597	        resp = (
-+   598	            supabase.table("maos")
-+   599	            .select("*")
-+   600	            .order("created_at", desc=True)
-+   601	            .limit(30)
-+   602	            .execute()
-+   603	        )
-+   604	        maos = resp.data
-+   605	
-+   606	        if not maos:
-+   607	            st.info(
-+   608	                "Nenhuma mao salva ainda. "
-+   609	                "Registre sua primeira mao na aba Nova Revisao!"
-+   610	            )
-+   611	        else:
-+   612	            for mao in maos:
-+   613	                nota_label = mao.get("nota", "?")
-+   614	                titulo = (
-+   615	                    f"{mao.get('cartas_master', '?')}  |  "
-+   616	                    f"{mao.get('posicao_master', '?')}  |  "
-+   617	                    f"Nota: {nota_label}/10"
-+   618	                )
-+   619	                with st.expander(titulo):
-+   620	                    col_a, col_b = st.columns(2)
-+   621	                    with col_a:
-+   622	                        st.markdown(
-+   623	                            f"**Stack:** {mao.get('stack_master', '?')} BBs"
-+   624	                        )
-+   625	                        st.markdown(f"**Flop:** {mao.get('flop', '-')}")
-+   626	                        st.markdown(f"**Turn:** {mao.get('turn', '-')}")
-+   627	                        st.markdown(f"**River:** {mao.get('river', '-')}")
-+   628	                    with col_b:
-+   629	                        if mao.get("cartas_oponente"):
-+   630	                            st.markdown(
-+   631	                                f"**Oponente:** {mao['cartas_oponente']}"
-+   632	                            )
-+   633	                        st.markdown("**Analise da IA:**")
-+   634	                        st.info(mao.get("analise_ia", ""))
-+   635	    except Exception as e:
-+   636	        st.error(f"Erro ao carregar biblioteca: {e}")
-+   637	
+import streamlit as st
+from supabase import create_client, Client
+from openai import OpenAI
+import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+import random
+import json
+import re
+
+st.set_page_config(page_title="Poker Study Buddy", layout="wide")
+
+# --- Conexoes ---
+url: str = st.secrets["SUPABASE_URL"]
+key: str = st.secrets["SUPABASE_KEY"]
+supabase: Client = create_client(url, key)
+openai_client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+
+st.title("PokerMind - Master Edition")
+st.caption("Revisao pos-jogo, analise ICM e simulador de decisoes")
+
+# ===================== RANGE CHART =====================
+
+RANKS = ['A', 'K', 'Q', 'J', 'T', '9', '8', '7', '6', '5', '4', '3', '2']
+
+
+def cell_label(i, j):
+    if i == j:
+        return f"{RANKS[i]}{RANKS[j]}"
+    elif i < j:
+        return f"{RANKS[i]}{RANKS[j]}s"
+    else:
+        return f"{RANKS[j]}{RANKS[i]}o"
+
+
+def build_range_chart(raise_hands=None, call_hands=None):
+    raise_hands = [h.strip() for h in (raise_hands or [])]
+    call_hands = [h.strip() for h in (call_hands or [])]
+    n = len(RANKS)
+
+    fig, ax = plt.subplots(figsize=(9, 9))
+    ax.set_facecolor('#16213e')
+    fig.patch.set_facecolor('#16213e')
+
+    for i in range(n):
+        for j in range(n):
+            label = cell_label(i, j)
+            if label in raise_hands:
+                color = '#27ae60'
+            elif label in call_hands:
+                color = '#e67e22'
+            else:
+                color = '#922b21'
+
+            rect = plt.Rectangle(
+                [j, n - 1 - i], 0.93, 0.93,
+                facecolor=color, edgecolor='#16213e', linewidth=1.5
+            )
+            ax.add_patch(rect)
+            ax.text(
+                j + 0.465, n - 1 - i + 0.465, label,
+                ha='center', va='center',
+                fontsize=6.2, color='white',
+                fontweight='bold', fontfamily='monospace'
+            )
+
+    ax.set_xlim(0, n)
+    ax.set_ylim(0, n)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_aspect('equal')
+
+    legend = [
+        mpatches.Patch(color='#27ae60', label='Raise / Bet'),
+        mpatches.Patch(color='#e67e22', label='Call'),
+        mpatches.Patch(color='#922b21', label='Fold'),
+    ]
+    ax.legend(
+        handles=legend, loc='lower right', fontsize=11,
+        facecolor='#1a1a2e', edgecolor='#aaa', labelcolor='white'
+    )
+    plt.tight_layout()
+    return fig
+
+
+# ===================== AI =====================
+
+def call_ai(prompt):
+    response = openai_client.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "Voce e um coach de poker especializado em Sit & Go, "
+                    "teoria dos jogos e ICM. "
+                    "Responda SEMPRE em portugues do Brasil. "
+                    "Quando pedido, retorne APENAS JSON valido, sem texto extra."
+                )
+            },
+            {"role": "user", "content": prompt}
+        ],
+        temperature=0.25,
+        max_tokens=1800
+    )
+    return response.choices[0].message.content
+
+
+def parse_json(raw):
+    try:
+        match = re.search(r'\{[\s\S]*\}', raw)
+        if match:
+            return json.loads(match.group())
+    except Exception:
+        pass
+    return {
+        "analise": raw,
+        "pontos_fortes": [],
+        "pontos_melhoria": [],
+        "range_raise": [],
+        "range_call": [],
+        "decisao_ideal": "?",
+        "nota": "?"
+    }
+
+
+def build_review_prompt(data, icm=False):
+    icm_bloco = ""
+    if icm:
+        icm_bloco = (
+            f"\nEsta e uma ANALISE ICM. Sobram {data.get('jogadores_restantes', '?')} jogadores. "
+            f"Estrutura: {data.get('estrutura', '?')}. "
+            "A sobrevivencia e o salto de payout pesam mais do que o EV de chips puro."
+        )
+
+    return f"""
+Analise esta mao de Sit & Go para o Master:
+
+MASTER:
+- Cartas: {data.get('cartas_master', '?')}
+- Posicao: {data.get('posicao_master', '?')}
+- Stack: {data.get('stack_master', '?')} BBs
+- Blinds: {data.get('blinds', '?')}
+- Jogadores restantes: {data.get('jogadores_restantes', '?')}
+- Estrutura de premiacao: {data.get('estrutura', '?')}
+
+BOARD:
+- Flop: {data.get('flop', '-')}
+- Turn: {data.get('turn', '-')}
+- River: {data.get('river', '-')}
+
+OPONENTE:
+- Cartas: {data.get('cartas_oponente', 'desconhecidas')}
+- Posicao: {data.get('posicao_oponente', 'desconhecida')}
+- Stack: {data.get('stack_oponente', 'desconhecido')}
+- Tendencias: {data.get('tendencias_oponente', 'nao informadas')}
+
+DESCRICAO DA MAO:
+{data.get('acao', '?')}
+{icm_bloco}
+
+Retorne APENAS este JSON (sem texto fora dele):
+{{
+  "analise": "analise detalhada de 3 a 5 paragrafos",
+  "pontos_fortes": ["ponto 1", "ponto 2"],
+  "pontos_melhoria": ["ponto 1", "ponto 2"],
+  "decisao_ideal": "Raise ou Call ou Fold",
+  "range_raise": ["AA", "KK", "AKs", "AKo"],
+  "range_call": ["JJ", "TT", "AQs"],
+  "nota": 7
+}}
+
+Para range_raise e range_call, liste as maos que voce jogaria dessa forma
+nessa posicao e situacao. Use: pares como "AA", suited como "AKs", offsuit como "AKo".
+"""
+
+
+def show_result(parsed, key_suffix=""):
+    col_left, col_right = st.columns([1, 1])
+
+    with col_left:
+        decisao = parsed.get("decisao_ideal", "?")
+        nota = parsed.get("nota", "?")
+        m1, m2 = st.columns(2)
+        m1.metric("Decisao ideal", decisao)
+        m2.metric("Nota", f"{nota} / 10")
+
+        st.markdown("**Analise:**")
+        st.info(parsed.get("analise", ""))
+
+        fortes = parsed.get("pontos_fortes", [])
+        melhoria = parsed.get("pontos_melhoria", [])
+        if fortes:
+            st.markdown("**Pontos fortes:**")
+            for p in fortes:
+                st.markdown(f"- {p}")
+        if melhoria:
+            st.markdown("**O que melhorar:**")
+            for p in melhoria:
+                st.markdown(f"- {p}")
+
+    with col_right:
+        st.markdown("**Range recomendado para essa situacao:**")
+        fig = build_range_chart(
+            raise_hands=parsed.get("range_raise", []),
+            call_hands=parsed.get("range_call", [])
+        )
+        st.pyplot(fig)
+        plt.close(fig)
+
+
+# ===================== SIMULADOR =====================
+
+ALL_RANKS = ['A', 'K', 'Q', 'J', 'T', '9', '8', '7', '6', '5', '4', '3', '2']
+ALL_SUITS = ['s', 'h', 'd', 'c']
+
+
+def random_card(used):
+    while True:
+        card = random.choice(ALL_RANKS) + random.choice(ALL_SUITS)
+        if card not in used:
+            used.add(card)
+            return card
+
+
+def generate_situation():
+    used = set()
+    c1 = random_card(used)
+    c2 = random_card(used)
+    flop = [random_card(used) for _ in range(3)]
+    turn = random_card(used)
+
+    aposta_oponente = random.choice([0, 0, 30, 50, 100, 150, 200])
+    pot = random.randint(2, 10) * 50
+
+    return {
+        "cartas": f"{c1} {c2}",
+        "flop": " ".join(flop),
+        "turn": turn,
+        "posicao": random.choice(["BTN", "SB", "BB", "UTG", "MP", "CO"]),
+        "stack": random.choice([8, 10, 12, 15, 20, 25]),
+        "jogadores_restantes": random.randint(3, 9),
+        "blinds": random.choice(["25/50", "50/100", "100/200", "200/400"]),
+        "pot": pot,
+        "aposta_oponente": aposta_oponente,
+    }
+
+
+def calcular_pot_odds(pot, aposta):
+    """Retorna (pot_odds_pct, ratio_str) ou None se nao houver aposta."""
+    if aposta <= 0:
+        return None, None
+    custo = aposta
+    pote_total = pot + aposta
+    pot_odds_pct = round(custo / pote_total * 100, 1)
+    ratio = round(pote_total / custo, 2)
+    return pot_odds_pct, ratio
+
+
+def build_simulator_prompt(hand, decisao_master):
+    pot_odds_pct, ratio = calcular_pot_odds(hand['pot'], hand['aposta_oponente'])
+
+    if pot_odds_pct:
+        pot_odds_bloco = (
+            f"- Pot odds: {pot_odds_pct}% (precisa de {pot_odds_pct}% de equity para chamar ser lucrativo)\n"
+            f"- Ratio pote/aposta: {ratio}:1"
+        )
+    else:
+        pot_odds_bloco = "- Sem aposta do oponente (Master age primeiro)"
+
+    return f"""
+Avalie esta decisao do Master em um Sit & Go com criterio estatistico rigoroso.
+
+SITUACAO:
+- Cartas: {hand['cartas']}
+- Posicao: {hand['posicao']}
+- Stack: {hand['stack']} BBs
+- Blinds: {hand['blinds']}
+- Jogadores restantes: {hand['jogadores_restantes']}
+- Board: Flop {hand['flop']} | Turn {hand['turn']}
+- Pote atual: {hand['pot']} fichas
+- Aposta do oponente: {hand['aposta_oponente']} fichas
+{pot_odds_bloco}
+
+DECISAO DO MASTER: {decisao_master}
+
+Analise seguindo EXATAMENTE esta logica:
+1. Estime a equity das cartas do Master ({hand['cartas']}) contra o range provavel do oponente nessa posicao e board.
+2. Compare a equity estimada com os pot odds ({pot_odds_pct}% necessarios para chamar ser lucrativo).
+3. Calcule o EV esperado de cada opcao (Fold = 0, Call = equity * pote - (1-equity) * aposta, Raise = estimar).
+4. Decida qual acao tem maior EV positivo.
+5. Compare com o que o Master fez.
+
+REGRA DE PONTUACAO (siga obrigatoriamente):
+- Se o Master ACERTOU a decisao de maior EV: nota entre 6 e 10.
+  - 10: decisao clara e obvia, sem margem de duvida
+  - 8-9: decisao correta em spot moderadamente dificil
+  - 6-7: decisao correta mas spot muito fechado (equity proxima dos pot odds)
+- Se o Master ERROU a decisao de maior EV: nota entre 0 e 5.
+  - 4-5: erro em spot muito fechado, decisao compreensivel
+  - 2-3: erro claro, EV da decisao correta era bem maior
+  - 0-1: erro grave, fold/call/raise em situacao onde a resposta era obvia
+
+Retorne APENAS este JSON (sem texto fora dele):
+{{
+  "decisao_correta": "Fold ou Call ou Raise",
+  "acertou": true,
+  "equity_estimada": 42,
+  "equity_minima_para_call": {pot_odds_pct if pot_odds_pct else 0},
+  "ev_decisao_master": -15,
+  "ev_decisao_correta": 30,
+  "explicacao": "explicacao clara e didatica de 2 a 3 paragrafos",
+  "raciocinio_ideal": "passo a passo: 1. equity estimada é X% porque... 2. pot odds exigem Y%... 3. portanto...",
+  "range_raise": ["AA", "KK", "AKs"],
+  "range_call": ["JJ", "TT", "AQs"],
+  "nota": 7
+}}
+"""
+
+
+# ===================== TABS =====================
+
+aba_revisao, aba_simulador, aba_biblioteca = st.tabs([
+    "Nova Revisao", "Simulador", "Biblioteca"
+])
+
+# =========== ABA REVISAO ===========
+with aba_revisao:
+    st.subheader("Registrar uma mao para estudo")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown("#### Cartas e Board")
+        cartas_master = st.text_input(
+            "Suas cartas (Master)", placeholder="Ex.: Ad Ks"
+        )
+        flop_val = st.text_input("Flop", placeholder="Ex.: 2h 7s 9c")
+        turn_val = st.text_input("Turn", placeholder="Ex.: Jh")
+        river_val = st.text_input("River", placeholder="Ex.: As")
+
+    with col2:
+        st.markdown("#### Situacao do torneio")
+        posicao_master = st.selectbox(
+            "Sua posicao", ["BTN", "SB", "BB", "UTG", "MP", "CO"]
+        )
+        stack_master = st.number_input("Seu stack (BBs)", min_value=1, value=20)
+        blinds_val = st.text_input("Blinds atuais", placeholder="Ex.: 100/200")
+        jogadores_val = st.number_input(
+            "Jogadores restantes na mesa", min_value=2, max_value=9, value=6
+        )
+        estrutura_val = st.selectbox(
+            "Estrutura de premiacao",
+            [
+                "Top 3 pagam (9-max)",
+                "Top 2 pagam (6-max)",
+                "Heads-up (2 jogadores)",
+                "Winner-take-all",
+            ],
+        )
+
+    acao_val = st.text_area(
+        "Descreva a acao da mao",
+        placeholder="Ex.: Abri 2.5BB no BTN, BB 3-betou, fui all-in...",
+        height=100,
+    )
+
+    with st.expander("Informacoes opcionais do oponente (preencha se souber)"):
+        col3, col4 = st.columns(2)
+        with col3:
+            cartas_op = st.text_input(
+                "Cartas do oponente", placeholder="Ex.: Kd Qh"
+            )
+            posicao_op = st.selectbox(
+                "Posicao do oponente",
+                ["Desconhecida", "BTN", "SB", "BB", "UTG", "MP", "CO"],
+            )
+        with col4:
+            stack_op = st.text_input(
+                "Stack do oponente (BBs)", placeholder="Ex.: 15"
+            )
+            tendencias_op = st.text_area(
+                "Tendencias do oponente",
+                placeholder="Ex.: Muito agressivo, nao faz fold ao c-bet",
+                height=80,
+            )
+
+    btn1, btn2 = st.columns(2)
+    with btn1:
+        analisar = st.button(
+            "Analisar mao", use_container_width=True, type="primary"
+        )
+    with btn2:
+        analisar_icm = st.button(
+            "Analisar com ICM", use_container_width=True
+        )
+
+    if analisar or analisar_icm:
+        if not cartas_master or not flop_val or not acao_val:
+            st.warning(
+                "Preencha ao menos: suas cartas, o flop e a descricao da acao."
+            )
+        else:
+            data_rev = {
+                "cartas_master": cartas_master,
+                "posicao_master": posicao_master,
+                "stack_master": stack_master,
+                "blinds": blinds_val,
+                "jogadores_restantes": jogadores_val,
+                "estrutura": estrutura_val,
+                "flop": flop_val,
+                "turn": turn_val,
+                "river": river_val,
+                "acao": acao_val,
+                "cartas_oponente": cartas_op or "desconhecidas",
+                "posicao_oponente": posicao_op,
+                "stack_oponente": stack_op or "desconhecido",
+                "tendencias_oponente": tendencias_op or "nao informadas",
+            }
+
+            with st.spinner("Analisando sua mao..."):
+                try:
+                    raw = call_ai(
+                        build_review_prompt(data_rev, icm=analisar_icm)
+                    )
+                    parsed = parse_json(raw)
+
+                    st.divider()
+                    st.subheader("Resultado da analise")
+                    show_result(parsed, key_suffix="revisao")
+
+                    try:
+                        nota_num = parsed.get("nota")
+                        if isinstance(nota_num, str):
+                            nota_num = int(nota_num) if nota_num.isdigit() else None
+                        supabase.table("maos").insert({
+                            "cartas_master": cartas_master,
+                            "posicao_master": posicao_master,
+                            "stack_master": int(stack_master),
+                            "flop": flop_val,
+                            "turn": turn_val,
+                            "river": river_val,
+                            "acao": acao_val,
+                            "cartas_oponente": cartas_op,
+                            "analise_ia": parsed.get("analise", ""),
+                            "nota": nota_num,
+                        }).execute()
+                        st.success("Mao salva na biblioteca!")
+                    except Exception as e:
+                        st.warning(f"Analise feita, mas nao foi possivel salvar: {e}")
+
+                except Exception as e:
+                    st.error(f"Erro na analise: {e}")
+
+# =========== ABA SIMULADOR ===========
+with aba_simulador:
+    st.subheader("Simulador de Decisoes")
+    st.caption(
+        "O app gera uma situacao real de Sit & Go. "
+        "Voce decide — a IA avalia se foi a jogada certa."
+    )
+
+    if "sim_hand" not in st.session_state:
+        st.session_state.sim_hand = None
+        st.session_state.sim_result = None
+        st.session_state.sim_decided = False
+        st.session_state.sim_decisao = None
+
+    if st.button("Gerar nova mao", type="primary"):
+        st.session_state.sim_hand = generate_situation()
+        st.session_state.sim_result = None
+        st.session_state.sim_decided = False
+        st.session_state.sim_decisao = None
+
+    if st.session_state.sim_hand:
+        hand = st.session_state.sim_hand
+        st.divider()
+
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Suas cartas", hand["cartas"])
+        c1.metric("Posicao", hand["posicao"])
+        c2.metric("Stack", f"{hand['stack']} BBs")
+        c2.metric("Blinds", hand["blinds"])
+        c3.metric("Jogadores restantes", hand["jogadores_restantes"])
+        c3.metric("Pote", f"{hand['pot']} fichas")
+
+        st.markdown(
+            f"**Board:** `{hand['flop']}` &nbsp;|&nbsp; Turn: `{hand['turn']}`"
+        )
+
+        if hand["aposta_oponente"] > 0:
+            st.warning(
+                f"O oponente apostou **{hand['aposta_oponente']} fichas**. "
+                "O que voce faz?"
+            )
+        else:
+            st.info("Sua vez de agir primeiro. O que voce faz?")
+
+        if not st.session_state.sim_decided:
+            bf, bc, br = st.columns(3)
+            with bf:
+                if st.button("FOLD", use_container_width=True):
+                    st.session_state.sim_decided = True
+                    st.session_state.sim_decisao = "Fold"
+                    st.rerun()
+            with bc:
+                if st.button("CALL", use_container_width=True):
+                    st.session_state.sim_decided = True
+                    st.session_state.sim_decisao = "Call"
+                    st.rerun()
+            with br:
+                if st.button("RAISE", use_container_width=True, type="primary"):
+                    st.session_state.sim_decided = True
+                    st.session_state.sim_decisao = "Raise"
+                    st.rerun()
+
+        if (
+            st.session_state.sim_decided
+            and st.session_state.sim_result is None
+        ):
+            with st.spinner("A IA esta avaliando sua decisao..."):
+                try:
+                    raw = call_ai(
+                        build_simulator_prompt(hand, st.session_state.sim_decisao)
+                    )
+                    st.session_state.sim_result = parse_json(raw)
+                except Exception as e:
+                    st.error(f"Erro: {e}")
+
+        if st.session_state.sim_result:
+            result = st.session_state.sim_result
+            st.divider()
+
+            acertou = result.get("acertou", False)
+            decisao_correta = result.get("decisao_correta", "?")
+            nota = result.get("nota", "?")
+
+            # Garantia de pontuacao coerente com o acerto
+            try:
+                nota_num = int(nota)
+                if acertou and nota_num < 6:
+                    nota_num = 6
+                if not acertou and nota_num > 5:
+                    nota_num = 5
+                nota = nota_num
+            except (ValueError, TypeError):
+                pass
+
+            if acertou:
+                st.success(
+                    f"Decisao correta! A jogada ideal era **{decisao_correta}**."
+                )
+            else:
+                st.error(
+                    f"Nao foi a melhor opcao. A jogada ideal era **{decisao_correta}**."
+                )
+
+            # Painel de estatisticas
+            equity = result.get("equity_estimada", "?")
+            equity_min = result.get("equity_minima_para_call", "?")
+            ev_master = result.get("ev_decisao_master", "?")
+            ev_correto = result.get("ev_decisao_correta", "?")
+
+            st.markdown("#### Estatisticas da decisao")
+            s1, s2, s3, s4, s5 = st.columns(5)
+            s1.metric("Nota", f"{nota}/10")
+            s2.metric("Equity estimada", f"{equity}%")
+            s3.metric("Equity minima p/ call", f"{equity_min}%")
+
+            try:
+                ev_m = float(ev_master)
+                ev_c = float(ev_correto)
+                s4.metric(
+                    "EV da sua decisao",
+                    f"{ev_m:+.0f}",
+                    delta=f"{ev_m - ev_c:+.0f} vs ideal",
+                    delta_color="normal"
+                )
+                s5.metric("EV da decisao ideal", f"{ev_c:+.0f}")
+            except (TypeError, ValueError):
+                s4.metric("EV da sua decisao", str(ev_master))
+                s5.metric("EV da decisao ideal", str(ev_correto))
+
+            raciocinio = result.get("raciocinio_ideal", "")
+            if raciocinio:
+                st.markdown("**Raciocinio passo a passo:**")
+                st.info(raciocinio)
+
+            # Sobrescreve a nota no resultado para show_result usar a corrigida
+            result["nota"] = nota
+            show_result(result, key_suffix="simulador")
+
+# =========== ABA BIBLIOTECA ===========
+with aba_biblioteca:
+    st.subheader("Suas maos salvas")
+
+    try:
+        resp = (
+            supabase.table("maos")
+            .select("*")
+            .order("created_at", desc=True)
+            .limit(30)
+            .execute()
+        )
+        maos = resp.data
+
+        if not maos:
+            st.info(
+                "Nenhuma mao salva ainda. "
+                "Registre sua primeira mao na aba Nova Revisao!"
+            )
+        else:
+            for mao in maos:
+                nota_label = mao.get("nota", "?")
+                titulo = (
+                    f"{mao.get('cartas_master', '?')}  |  "
+                    f"{mao.get('posicao_master', '?')}  |  "
+                    f"Nota: {nota_label}/10"
+                )
+                with st.expander(titulo):
+                    col_a, col_b = st.columns(2)
+                    with col_a:
+                        st.markdown(
+                            f"**Stack:** {mao.get('stack_master', '?')} BBs"
+                        )
+                        st.markdown(f"**Flop:** {mao.get('flop', '-')}")
+                        st.markdown(f"**Turn:** {mao.get('turn', '-')}")
+                        st.markdown(f"**River:** {mao.get('river', '-')}")
+                    with col_b:
+                        if mao.get("cartas_oponente"):
+                            st.markdown(
+                                f"**Oponente:** {mao['cartas_oponente']}"
+                            )
+                        st.markdown("**Analise da IA:**")
+                        st.info(mao.get("analise_ia", ""))
+    except Exception as e:
+        st.error(f"Erro ao carregar biblioteca: {e}")
