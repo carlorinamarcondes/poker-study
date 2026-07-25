@@ -22,6 +22,47 @@ st.caption("Revisao pos-jogo, analise ICM e simulador de decisoes")
 
 RANKS = ['A', 'K', 'Q', 'J', 'T', '9', '8', '7', '6', '5', '4', '3', '2']
 
+# Equity aproximada vs range tipico de oponente (%)
+EQUITY_TABLE = {
+    'AA': 85, 'KK': 82, 'QQ': 80, 'JJ': 77, 'TT': 75,
+    '99': 72, '88': 69, '77': 67, '66': 64, '55': 62,
+    '44': 60, '33': 58, '22': 55,
+    'AKs': 67, 'AQs': 66, 'AJs': 65, 'ATs': 64, 'A9s': 62,
+    'A8s': 61, 'A7s': 60, 'A6s': 59, 'A5s': 59, 'A4s': 58,
+    'A3s': 57, 'A2s': 56,
+    'AKo': 65, 'AQo': 64, 'AJo': 63, 'ATo': 62, 'A9o': 60,
+    'A8o': 59, 'A7o': 58, 'A6o': 57, 'A5o': 57, 'A4o': 56,
+    'A3o': 55, 'A2o': 54,
+    'KQs': 62, 'KJs': 61, 'KTs': 60, 'K9s': 58, 'K8s': 56,
+    'K7s': 55, 'K6s': 54, 'K5s': 53, 'K4s': 52, 'K3s': 51, 'K2s': 50,
+    'KQo': 60, 'KJo': 59, 'KTo': 58, 'K9o': 56, 'K8o': 54,
+    'K7o': 53, 'K6o': 52, 'K5o': 51, 'K4o': 50, 'K3o': 49, 'K2o': 48,
+    'QJs': 58, 'QTs': 57, 'Q9s': 55, 'Q8s': 53, 'Q7s': 52,
+    'Q6s': 51, 'Q5s': 50, 'Q4s': 49, 'Q3s': 48, 'Q2s': 47,
+    'QJo': 56, 'QTo': 55, 'Q9o': 53, 'Q8o': 51, 'Q7o': 50,
+    'Q6o': 49, 'Q5o': 48, 'Q4o': 47, 'Q3o': 46, 'Q2o': 45,
+    'JTs': 55, 'J9s': 53, 'J8s': 51, 'J7s': 50, 'J6s': 48,
+    'J5s': 47, 'J4s': 46, 'J3s': 45, 'J2s': 44,
+    'JTo': 53, 'J9o': 51, 'J8o': 49, 'J7o': 48, 'J6o': 46,
+    'J5o': 45, 'J4o': 44, 'J3o': 43, 'J2o': 42,
+    'T9s': 52, 'T8s': 50, 'T7s': 48, 'T6s': 47, 'T5s': 45,
+    'T4s': 44, 'T3s': 43, 'T2s': 42,
+    'T9o': 50, 'T8o': 48, 'T7o': 46, 'T6o': 45, 'T5o': 43,
+    'T4o': 42, 'T3o': 41, 'T2o': 40,
+    '98s': 49, '97s': 47, '96s': 46, '95s': 44, '94s': 43, '93s': 42, '92s': 41,
+    '98o': 47, '97o': 45, '96o': 44, '95o': 42, '94o': 41, '93o': 40, '92o': 39,
+    '87s': 46, '86s': 45, '85s': 43, '84s': 42, '83s': 41, '82s': 40,
+    '87o': 44, '86o': 43, '85o': 41, '84o': 40, '83o': 39, '82o': 38,
+    '76s': 44, '75s': 43, '74s': 41, '73s': 40, '72s': 39,
+    '76o': 42, '75o': 41, '74o': 39, '73o': 38, '72o': 37,
+    '65s': 42, '64s': 41, '63s': 39, '62s': 38,
+    '65o': 40, '64o': 39, '63o': 37, '62o': 36,
+    '54s': 40, '53s': 39, '52s': 37,
+    '54o': 38, '53o': 37, '52o': 35,
+    '43s': 38, '42s': 37, '43o': 36, '42o': 35,
+    '32s': 36, '32o': 34,
+}
+
 
 def cell_label(i, j):
     if i == j:
@@ -37,7 +78,7 @@ def build_range_chart(raise_hands=None, call_hands=None):
     call_hands = [h.strip() for h in (call_hands or [])]
     n = len(RANKS)
 
-    fig, ax = plt.subplots(figsize=(9, 9))
+    fig, ax = plt.subplots(figsize=(14, 14))
     ax.set_facecolor('#16213e')
     fig.patch.set_facecolor('#16213e')
 
@@ -56,11 +97,22 @@ def build_range_chart(raise_hands=None, call_hands=None):
                 facecolor=color, edgecolor='#16213e', linewidth=1.5
             )
             ax.add_patch(rect)
+
+            # Nome da mao (linha de cima)
             ax.text(
-                j + 0.465, n - 1 - i + 0.465, label,
+                j + 0.465, n - 1 - i + 0.63, label,
                 ha='center', va='center',
-                fontsize=6.2, color='white',
+                fontsize=9, color='white',
                 fontweight='bold', fontfamily='monospace'
+            )
+
+            # Equity (linha de baixo)
+            equity = EQUITY_TABLE.get(label, '-')
+            ax.text(
+                j + 0.465, n - 1 - i + 0.28, f"{equity}%",
+                ha='center', va='center',
+                fontsize=8, color='#e8e8e8',
+                fontfamily='monospace'
             )
 
     ax.set_xlim(0, n)
@@ -75,7 +127,7 @@ def build_range_chart(raise_hands=None, call_hands=None):
         mpatches.Patch(color='#922b21', label='Fold'),
     ]
     ax.legend(
-        handles=legend, loc='lower right', fontsize=11,
+        handles=legend, loc='lower right', fontsize=13,
         facecolor='#1a1a2e', edgecolor='#aaa', labelcolor='white'
     )
     plt.tight_layout()
@@ -585,8 +637,10 @@ with aba_simulador:
                 st.markdown("**Raciocinio passo a passo:**")
                 st.info(raciocinio)
 
-            # Sobrescreve a nota no resultado para show_result usar a corrigida
+            # Garante que show_result encontra os campos certos
             result["nota"] = nota
+            result["decisao_ideal"] = result.get("decisao_correta", "?")
+            result["analise"] = result.get("explicacao", result.get("analise", ""))
             show_result(result, key_suffix="simulador")
 
 # =========== ABA BIBLIOTECA ===========
